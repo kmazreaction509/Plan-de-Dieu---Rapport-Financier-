@@ -49,7 +49,7 @@ select{font-size:16px;padding:8px;border-radius:8px;border:2px solid var(--bd);b
   <label>Dat</label><input type="date" id="d">
   <label>Gain / Pèt (Gdes) — pèt = siy moins</label><input type="number" inputmode="decimal" id="g" placeholder="0">
   <label>Reparasyon (Gdes)</label><input type="number" inputmode="decimal" id="r" placeholder="0">
-  <div class="net"><span>Gain net / Pèt net</span><span id="nv">0.00</span></div>
+  <div class="hint" id="dp" style="text-align:left;margin-top:8px"></div><div class="net"><span>Gain net / Pèt net</span><span id="nv">0.00</span></div>
   <button class="btn" id="sv">Anrejistre</button>
   <button class="btn s hide" id="cn">Anile modifikasyon</button>
  </div>
@@ -61,6 +61,7 @@ select{font-size:16px;padding:8px;border-radius:8px;border:2px solid var(--bd);b
 <section id="p3" class="hide">
  <div id="kp"></div>
  <div class="card"><h3>Evolisyon chak mwa</h3>Ane: <select id="yr"></select><div id="ch" style="margin-top:10px"></div></div>
+ <div class="card"><label style="display:flex;gap:10px;align-items:center;margin:0;font-size:14px;color:inherit"><input type="checkbox" id="dpt" style="width:24px;height:24px"> Ajoute depans MY DAILY EXPENSES sou reparasyon</label><div class="hint" id="dpi" style="text-align:left"></div></div>
  <button class="btn g" id="ex">Telechaje kopi (CSV pou Excel)</button>
  <button class="btn s" id="im">Mete yon kopi CSV ankò</button>
  <input type="file" id="fi" accept=".csv,text/csv" class="hide">
@@ -80,10 +81,16 @@ const cls=v=>v<0?"neg":v>0?"pos":"";
 const MO=["Janvye","Fevriye","Mas","Avril","Me","Jen","Jiyè","Out","Septanm","Oktòb","Novanm","Desanm"];
 const today=()=>{const t=new Date();return t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+String(t.getDate()).padStart(2,"0")};
 const fd=s=>s.split("-").reverse().join("/");
-const net=e=>e.g-e.r;
-function prev(){const v=n($("g").value)-n($("r").value);$("nv").textContent=f(v)+" Gdes";$("nv").className=cls(v)}
+const DK="mde_v1",ON="pdc_dep_on";let DM={},FE={},DN=0;
+const dOn=()=>{try{return localStorage.getItem(ON)!=="0"}catch(e){return true}};
+function prep(){DM={};FE={};DN=0;if(dOn()){try{const t=JSON.parse(localStorage.getItem(DK)||"null");((t&&t.ex)||[]).forEach(x=>{DM[x.d]=(DM[x.d]||0)+x.a*(x.x||1);DN++})}catch(e){}}
+ [...E].sort((a,b)=>a.d<b.d?-1:a.d>b.d?1:a.id-b.id).forEach(e=>{if(!(e.d in FE))FE[e.d]=e.id})}
+const depOf=e=>FE[e.d]===e.id?(DM[e.d]||0):0,rr=e=>e.r+depOf(e),net=e=>e.g-rr(e);
+function prev(){prep();const d=$("d").value,fe=FE[d],dp=(fe===undefined||fe===edit)?(DM[d]||0):0;
+ $("dp").textContent=dp?"+ Depans jou a (MY DAILY EXPENSES): "+f(dp)+" Gdes, ajoute otomatikman sou reparasyon.":(DM[d]?"Depans jou a ("+f(DM[d])+" Gdes) deja konte sou yon lòt antre menm jou a.":"");
+ const v=n($("g").value)-n($("r").value)-dp;$("nv").textContent=f(v)+" Gdes";$("nv").className=cls(v)}
 function reset(){edit=null;$("d").value=today();$("g").value="";$("r").value="";$("ft").textContent="Nouvo antre";$("sv").textContent="Anrejistre";$("cn").classList.add("hide");prev()}
-$("g").oninput=$("r").oninput=prev;
+$("g").oninput=$("r").oninput=$("d").oninput=$("d").onchange=prev;$("dpt").onchange=()=>{try{localStorage.setItem(ON,$("dpt").checked?"1":"0")}catch(e){}prev();render()};
 $("sv").onclick=()=>{
  const d=$("d").value;if(!d){alert("Mete yon dat.");return}
  const o={d,g:n($("g").value),r:n($("r").value)};
@@ -91,24 +98,27 @@ $("sv").onclick=()=>{
  save();reset();render()};
 $("cn").onclick=reset;
 function render(){
+ prep();$("dpt").checked=dOn();
  const S=[...E].sort((a,b)=>a.d<b.d?-1:a.d>b.d?1:a.id-b.id);
  let c=0;const bal={};S.forEach(e=>{c+=net(e);bal[e.id]=c});
- $("ls").innerHTML=S.length?[...S].reverse().map(e=>`<div class="row"><div><b>${fd(e.d)}</b><small>Gain/Pèt ${f(e.g)} · Repa. ${f(e.r)}</small><small>Montan an: ${f(bal[e.id])} Gdes</small></div><div style="text-align:right"><b class="${cls(net(e))}">${f(net(e))}</b><br><a href="#" data-e="${e.id}">Modifye</a> · <a href="#" data-x="${e.id}">Efase</a></div></div>`).join(""):"<p>Pa gen antre ankò.</p>";
+ $("ls").innerHTML=S.length?[...S].reverse().map(e=>`<div class="row"><div><b>${fd(e.d)}</b><small>Gain/Pèt ${f(e.g)} · Repa. ${f(e.r)}${depOf(e)?` + Depans ${f(depOf(e))}`:""}</small><small>Montan an: ${f(bal[e.id])} Gdes</small></div><div style="text-align:right"><b class="${cls(net(e))}">${f(net(e))}</b><br><a href="#" data-e="${e.id}">Modifye</a> · <a href="#" data-x="${e.id}">Efase</a></div></div>`).join(""):"<p>Pa gen antre ankò.</p>";
  $("ls").querySelectorAll("a").forEach(a=>a.onclick=ev=>{ev.preventDefault();
   if(a.dataset.e){const e=E.find(x=>String(x.id)===a.dataset.e);edit=e.id;$("d").value=e.d;$("g").value=e.g;$("r").value=e.r;$("ft").textContent="Modifye antre a";$("sv").textContent="Sove modifikasyon";$("cn").classList.remove("hide");prev();scrollTo(0,0)}
   else if(confirm("Efase antre sa a?")){E=E.filter(x=>String(x.id)!==a.dataset.x);save();render()}});
  // monthly
- const M={};E.forEach(e=>{const k=e.d.slice(0,7);const m=M[k]||(M[k]={g:0,r:0,b:0,p:0});const v=net(e);m.g+=e.g>0?e.g:0;m.r+=e.r;if(v>0)m.b+=v;else m.p-=v});
+ const M={};E.forEach(e=>{const k=e.d.slice(0,7);const m=M[k]||(M[k]={g:0,r:0,b:0,p:0});const v=net(e);m.g+=e.g>0?e.g:0;m.r+=rr(e);if(v>0)m.b+=v;else m.p-=v});
  const ks=Object.keys(M).sort().reverse();
  $("ms").innerHTML=ks.length?ks.map(k=>{const m=M[k],bl=m.b-m.p;return `<div class="row"><div><b>${MO[+k.slice(5)-1]} ${k.slice(0,4)}</b><small>Gain ${f(m.g)} · Repa. ${f(m.r)}</small><small>Benefis ${f(m.b)} · Pèt ${f(m.p)}</small></div><div style="text-align:right"><b class="${cls(bl)}">${f(bl)}</b><small>${bl>=0?"BENEFIS":"PÈT"}</small></div></div>`}).join(""):"<p>Pa gen done ankò.</p>";
  // dashboard
- let tg=0,tr=0,tb=0,tp=0;E.forEach(e=>{const v=net(e);if(e.g>0)tg+=e.g;tr+=e.r;if(v>0)tb+=v;else tp-=v});
+ let tg=0,tr=0,tb=0,tp=0;E.forEach(e=>{const v=net(e);if(e.g>0)tg+=e.g;tr+=rr(e);if(v>0)tb+=v;else tp-=v});
  const kv=[["TOTAL GAIN",tg],["TOTAL REPARASYON",tr],["TOTAL BENEFIS",tb],["TOTAL PÈT",tp]];
  $("kp").innerHTML=kv.map(x=>`<div class="kp">${x[0]}<span>${f(x[1])}</span></div>`).join("")+`<div class="kp big">BILAN JENERAL<span class="${cls(tb-tp)}">${f(tb-tp)}</span></div>`;
  const ys=[...new Set(E.map(e=>e.d.slice(0,4)).concat([today().slice(0,4)]))].sort();
  const cur=$("yr").value||today().slice(0,4);
  $("yr").innerHTML=ys.map(y=>`<option${y===cur?" selected":""}>${y}</option>`).join("");
  chart($("yr").value);
+ const miss=Object.keys(DM).filter(d=>!(d in FE)).sort().reverse();
+ $("dpi").textContent=!dOn()?"Depans pa ajoute sou reparasyon (dezaktive).":!DN?"Pa jwenn done depans. Louvri aplikasyon Depans lan sou menm sit la.":DN+" depans jwenn. "+(miss.length?"Jou sa yo gen depans men poko gen rapò: "+miss.slice(0,6).map(fd).join(", ")+(miss.length>6?"...":"")+".":"Tout jou ki gen depans gen rapò.");
 }
 function chart(y){
  const b=Array(12).fill(0);E.forEach(e=>{if(e.d.slice(0,4)===y)b[+e.d.slice(5,7)-1]+=net(e)});
@@ -123,8 +133,8 @@ document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
  ["p1","p2","p3"].forEach(p=>$(p).classList.toggle("hide",p!==b.dataset.p));scrollTo(0,0)});
 // CSV export / import
 $("ex").onclick=async()=>{
- const S=[...E].sort((a,b)=>a.d<b.d?-1:1);let c=0;
- const rows=["Dat,Gain / Pèt,Reparasyon,Gain net / Pèt net,Montan an (Gdes)"].concat(S.map(e=>{c+=net(e);return [e.d,e.g,e.r,net(e),c].join(",")}));
+ prep();const S=[...E].sort((a,b)=>a.d<b.d?-1:a.d>b.d?1:a.id-b.id);let c=0;
+ const rows=["Dat,Gain / Pèt,Reparasyon,Gain net / Pèt net,Montan an (Gdes),Depans ajoute"].concat(S.map(e=>{c+=net(e);return [e.d,e.g,e.r,net(e),c,depOf(e)].join(",")}));
  try{const u=URL.createObjectURL(new Blob(["\ufeff"+rows.join("\n")],{type:"text/csv"})),l=document.createElement("a");l.href=u;l.download="PLAN_DE_DIEU_CENTER_kopi.csv";document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),4000)}catch(e){alert("Pa t kapab telechaje fichye a.")}};
 $("im").onclick=()=>$("fi").click();
 $("fi").onchange=async()=>{
